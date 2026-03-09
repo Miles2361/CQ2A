@@ -1,0 +1,107 @@
+-- Adminer 5.3.0 MariaDB 5.5.5-10.5.15-MariaDB-0+deb11u1 dump
+
+SET NAMES utf8;
+SET time_zone = '+00:00';
+SET foreign_key_checks = 0;
+SET sql_mode = 'NO_AUTO_VALUE_ON_ZERO';
+
+SET NAMES utf8mb4;
+
+DROP TABLE IF EXISTS `Afficher`;
+CREATE TABLE `Afficher` (
+  `Id_Compte` int(11) NOT NULL,
+  `Id_Ecran` int(11) NOT NULL,
+  PRIMARY KEY (`Id_Compte`,`Id_Ecran`),
+  KEY `Id_Ecran` (`Id_Ecran`),
+  CONSTRAINT `Afficher_ibfk_1` FOREIGN KEY (`Id_Compte`) REFERENCES `Compte` (`Id_Compte`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `Afficher_ibfk_2` FOREIGN KEY (`Id_Ecran`) REFERENCES `raspberry_pi` (`Id_Ecran`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO `Afficher` (`Id_Compte`, `Id_Ecran`) VALUES
+(1,	1),
+(1,	2),
+(2,	3),
+(3,	1);
+
+DROP TABLE IF EXISTS `Compte`;
+CREATE TABLE `Compte` (
+  `Id_Compte` int(11) NOT NULL AUTO_INCREMENT,
+  `Nom` varchar(100) NOT NULL,
+  `Prenom` varchar(100) NOT NULL,
+  `Email` varchar(150) NOT NULL,
+  `login` varchar(100) NOT NULL,
+  `mot_de_passe` varchar(255) NOT NULL,
+  `derniere_date_de_connexion` datetime DEFAULT NULL,
+  `niveau_d_acces` int(11) NOT NULL,
+  PRIMARY KEY (`Id_Compte`),
+  UNIQUE KEY `Email` (`Email`),
+  UNIQUE KEY `login` (`login`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO `Compte` (`Id_Compte`, `Nom`, `Prenom`, `Email`, `login`, `mot_de_passe`, `derniere_date_de_connexion`, `niveau_d_acces`) VALUES
+(1,	'Dupont',	'Jean',	'jean.dupont@email.com',	'jdupont',	'mdp123',	'2026-02-25 08:15:00',	1),
+(2,	'Martin',	'Sophie',	'sophie.martin@email.com',	'smartin',	'mdp123',	'2026-02-25 09:20:00',	2),
+(3,	'Bernard',	'Lucas',	'lucas.bernard@email.com',	'lbernard',	'mdp123',	'2026-02-24 18:45:00',	1);
+
+DROP TABLE IF EXISTS `DATA`;
+CREATE TABLE `DATA` (
+  `Id_DATA` int(11) NOT NULL AUTO_INCREMENT,
+  `Temps` datetime NOT NULL,
+  `Temperature` float DEFAULT NULL,
+  `humidite` float DEFAULT NULL,
+  `CO2` float DEFAULT NULL,
+  `COV` float DEFAULT NULL,
+  `PM10` float DEFAULT NULL,
+  `PM2_5` float DEFAULT NULL,
+  `PM1` float DEFAULT NULL,
+  PRIMARY KEY (`Id_DATA`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO `DATA` (`Id_DATA`, `Temps`, `Temperature`, `humidite`, `CO2`, `COV`, `PM10`, `PM2_5`, `PM1`) VALUES
+(1,	'2026-02-26 08:00:00',	21.5,	45.2,	420,	0.3,	12,	8,	5),
+(2,	'2026-02-26 09:00:00',	22.1,	47.8,	430,	0.4,	15,	9,	6),
+(3,	'2026-02-26 10:00:00',	23,	50.1,	460,	0.5,	18,	11,	7),
+(4,	'2026-02-26 11:00:00',	24.3,	52,	500,	0.6,	20,	13,	9),
+(5,	'2026-02-26 12:00:00',	25,	55.4,	550,	0.8,	25,	16,	11),
+(6,	'2026-02-26 08:00:00',	21.5,	45.2,	420,	0.3,	12,	8,	5),
+(7,	'2026-02-26 09:00:00',	22.1,	47.8,	430,	0.4,	15,	9,	6),
+(8,	'2026-02-26 10:00:00',	23,	50.1,	460,	0.5,	18,	11,	7),
+(9,	'2026-02-26 11:00:00',	24.3,	52,	500,	0.6,	20,	13,	9),
+(10,	'2026-02-26 12:00:00',	25,	55.4,	550,	0.8,	25,	16,	11),
+(11,	'2026-02-26 08:00:00',	26,	45.2,	420,	0.5,	12,	8,	5);
+
+DROP TABLE IF EXISTS `raspberry_pi`;
+CREATE TABLE `raspberry_pi` (
+  `Id_Ecran` int(11) NOT NULL AUTO_INCREMENT,
+  `Adresse_IP` varchar(45) NOT NULL,
+  `Nom` varchar(100) DEFAULT NULL,
+  `niveau_d_acces` int(11) NOT NULL,
+  PRIMARY KEY (`Id_Ecran`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO `raspberry_pi` (`Id_Ecran`, `Adresse_IP`, `Nom`, `niveau_d_acces`) VALUES
+(1,	'192.168.1.10',	'RPI_Salon',	1),
+(2,	'192.168.1.11',	'RPI_Bureau',	1),
+(3,	'192.168.1.12',	'RPI_Laboratoire',	2),
+(4,	'192.168.1.10',	'RPI_Salon',	1),
+(5,	'192.168.1.11',	'RPI_Bureau',	1),
+(6,	'192.168.1.12',	'RPI_Laboratoire',	2);
+
+DROP TABLE IF EXISTS `Se_connecter`;
+CREATE TABLE `Se_connecter` (
+  `Id_Compte` int(11) NOT NULL,
+  `Id_DATA` int(11) NOT NULL,
+  PRIMARY KEY (`Id_Compte`,`Id_DATA`),
+  KEY `Id_DATA` (`Id_DATA`),
+  CONSTRAINT `Se_connecter_ibfk_1` FOREIGN KEY (`Id_Compte`) REFERENCES `Compte` (`Id_Compte`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `Se_connecter_ibfk_2` FOREIGN KEY (`Id_DATA`) REFERENCES `DATA` (`Id_DATA`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO `Se_connecter` (`Id_Compte`, `Id_DATA`) VALUES
+(1,	1),
+(1,	2),
+(2,	3),
+(2,	4),
+(3,	5);
+
+-- 2026-03-09 09:33:21 UTC

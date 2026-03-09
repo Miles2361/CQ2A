@@ -21,13 +21,13 @@ $datas = $stmt->fetchAll();
 <div class="top-menu">
     <a href="index.php">📊 Tableau de bord</a>
     <a href="historique.php" class="active">📈 Historique</a>
-    <a href="#">ℹ À propos</a>
+    <a href="About.php">ℹ À propos</a>
 </div>
 
 <h1>📈 Historique des données</h1>
 
 <div class="polluants">
-    <table class="history-table">
+    <table class="history-table">             
         <tr>
             <th>Date</th>
             <th>Temp</th>
@@ -48,7 +48,7 @@ $datas = $stmt->fetchAll();
             <td><?= $row['PM2_5'] ?></td>
             <td><?= $row['PM10'] ?></td>
         </tr>
-        <?php endforeach; ?>
+        <?php endforeach; ?>    <!--// Boucle pour afficher chaque ligne de données dans le tableau -->
 
     </table>
 </div>
