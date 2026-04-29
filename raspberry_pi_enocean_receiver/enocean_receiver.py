@@ -6,36 +6,69 @@
 # Décodage EEP A5-09-04 (CO2, Humidité, Température)
 #          EEP A5-09-05 (COV)
 #          EEP A5-09-07 (Particules fines PM1, PM2.5, PM10)
-# Insertion dans la table DATA de la base CQ2A
+# Envoi des données via API HTTP → data.php
+# Contrôle automatique du ventilateur selon les seuils de qualité d'air
 # =============================================================================
 
 SERIAL_PORT = "/dev/serial0"
 
-# --- Configuration MariaDB ---
-DB_HOST     = "172.16.116.52"
-DB_PORT     = 3306
-DB_NAME     = "CQ2A"
-DB_USER     = "root"
-DB_PASSWORD = "eclipse"
+# --- Configuration API ---
+API_URL     = "http://cq2a-2026.lycee-lgm.fr/API/data.php"
+API_TIMEOUT = 5   # secondes
 
 # --- Configuration des sondes ---
-# Associer chaque adresse EnOcean à son nom et son EEP fixe
 # EEP connus : "A5-09-04" (CO2+Hum+Temp), "A5-09-05" (COV), "A5-09-07" (PM)
 SONDES = {
-    "FF:D5:A8:0A": {"nom": "E4000",  "eep": "A5-09-04"},  # CO2 + Température + Humidité
+    "FF:D5:A8:0A": {"nom": "E4000",     "eep": "A5-09-04"},  # CO2 + Température + Humidité
     "FF:D5:A8:0F": {"nom": "E4000_COV", "eep": "A5-09-05"},  # COV uniquement
-    "FF:D5:A8:14": {"nom": "P4000",  "eep": "A5-09-07"},  # Particules fines PM1/PM2.5/PM10
+    "FF:D5:A8:14": {"nom": "P4000",     "eep": "A5-09-07"},  # Particules fines PM1/PM2.5/PM10
 }
 
-# Timeout en secondes : si une sonde ne répond pas dans ce délai,
-# on insère quand même avec ses champs à NULL
+# Timeout en secondes : si une sonde ne répond pas, on envoie quand même
 BUFFER_TIMEOUT = 60
+
+# =============================================================================
+# SEUILS DE QUALITÉ D'AIR - contrôle automatique du ventilateur
+#
+# ON  : le ventilateur s'allume si AU MOINS UN seuil "danger" est dépassé
+# OFF : le ventilateur s'éteint uniquement quand TOUS les seuils "sécurité"
+#       sont repassés en dessous (hysteresis pour éviter les oscillations)
+#
+# Valeurs de référence :
+#   CO2  : < 1000 ppm  (bon), 1000-2000 ppm (moyen), > 2000 ppm (dangereux)
+#   COV  : < 50 ppm    (bon), > 100 ppm (dangereux)   [équiv. formaldéhyde]
+#   PM2.5: < 25 µg/m³  (OMS), > 50 µg/m³ (dangereux)
+#   PM10 : < 50 µg/m³  (OMS), > 100 µg/m³ (dangereux)
+# =============================================================================
+
+SEUILS = {
+    # Valeurs au-dessus desquelles le ventilateur s'ALLUME
+    "danger": {
+        "co2":   1500,   # ppm
+        "cov":   50,     # ppm équiv. formaldéhyde
+        "pm2_5": 25,     # µg/m³
+        "pm10":  50,     # µg/m³
+    },
+    # Valeurs en dessous desquelles le ventilateur s'ÉTEINT (hysteresis ~20%)
+    "securite": {
+        "co2":   1200,   # ppm
+        "cov":   35,     # ppm
+        "pm2_5": 15,     # µg/m³
+        "pm10":  35,     # µg/m³
+    },
+}
+
+# Chemin vers le script de commande de la prise/ventilateur
+PRISE_SCRIPT = "/home/pi/CQ2A/raspberry_pi_transmitter/prise_commande.py"
 
 import time
 import traceback
+import urllib.request
+import urllib.error
+import json
+import subprocess
 from datetime import datetime
 import enocean.utils
-import mariadb
 
 from enocean.consolelogger import init_logging
 from enocean.communicators.serialcommunicator import SerialCommunicator
@@ -43,20 +76,126 @@ from enocean.protocol.constants import PACKET
 
 
 # =============================================================================
-# CONNEXION BASE DE DONNÉES
+# CONTRÔLE AUTOMATIQUE DU VENTILATEUR
 # =============================================================================
 
-def connect_db():
-    """Crée et retourne une connexion MariaDB."""
-    conn = mariadb.connect(
-        host=DB_HOST,
-        port=DB_PORT,
-        database=DB_NAME,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        autocommit=True
+# État courant du ventilateur (évite les commandes redondantes)
+_ventilateur_actif = False
+
+def commander_ventilateur(action):
+    """
+    Lance prise_commande.py avec l'action 'on' ou 'off'.
+    Retourne True si la commande a réussi.
+    """
+    global _ventilateur_actif
+    try:
+        result = subprocess.run(
+            ["python3", PRISE_SCRIPT, action],
+            timeout=10,
+            capture_output=True,
+            text=True
+        )
+        if result.returncode == 0:
+            _ventilateur_actif = (action == "on")
+            print(f"  [VENTILATEUR] Commande '{action.upper()}' envoyée avec succès.")
+            return True
+        else:
+            print(f"  [VENTILATEUR] Erreur commande '{action}' (code {result.returncode}): {result.stderr.strip()}")
+    except subprocess.TimeoutExpired:
+        print(f"  [VENTILATEUR] Timeout lors de la commande '{action}'.")
+    except Exception as e:
+        print(f"  [VENTILATEUR] Exception : {e}")
+    return False
+
+
+def gerer_ventilateur(mesures):
+    """
+    Vérifie les mesures par rapport aux seuils et commande le ventilateur.
+
+    Logique d'hysteresis :
+      - S'il est éteint  → l'allumer si AU MOINS UN seuil "danger" est dépassé
+      - S'il est allumé  → l'éteindre uniquement si TOUS les seuils "securite" sont OK
+    """
+    global _ventilateur_actif
+
+    # Construire la liste des dépassements de seuil "danger"
+    depassements = []
+    for capteur, seuil in SEUILS["danger"].items():
+        valeur = mesures.get(capteur)
+        if valeur is not None and valeur > seuil:
+            depassements.append(f"{capteur}={valeur} > {seuil}")
+
+    # Construire la liste des capteurs encore au-dessus du seuil "sécurité"
+    encore_eleves = []
+    for capteur, seuil in SEUILS["securite"].items():
+        valeur = mesures.get(capteur)
+        if valeur is not None and valeur > seuil:
+            encore_eleves.append(f"{capteur}={valeur} > {seuil}")
+
+    if not _ventilateur_actif:
+        # Ventilateur éteint → l'allumer si au moins un seuil danger est dépassé
+        if depassements:
+            print(f"  [VENTILATEUR] ⚠ Seuils dépassés : {', '.join(depassements)}")
+            print(f"  [VENTILATEUR] → Activation automatique du ventilateur.")
+            commander_ventilateur("on")
+        else:
+            print(f"  [VENTILATEUR] Qualité d'air OK, ventilateur inactif.")
+    else:
+        # Ventilateur allumé → l'éteindre seulement si tout est revenu sous sécurité
+        if encore_eleves:
+            print(f"  [VENTILATEUR] Encore élevé : {', '.join(encore_eleves)} → ventilateur maintenu ON.")
+        else:
+            print(f"  [VENTILATEUR] ✓ Tous les seuils sont repassés sous la limite de sécurité.")
+            print(f"  [VENTILATEUR] → Désactivation automatique du ventilateur.")
+            commander_ventilateur("off")
+
+
+# =============================================================================
+# ENVOI API HTTP
+# =============================================================================
+
+def envoyer_data(mesures):
+    """
+    Envoie les mesures à l'API via POST HTTP.
+    Correspond exactement aux champs attendus par data.php.
+    """
+    payload = {
+        "Temps":       datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "Temperature": mesures.get("temperature"),
+        "humidite":    mesures.get("humidite"),
+        "CO2":         mesures.get("co2"),
+        "COV":         mesures.get("cov"),
+        "PM10":        mesures.get("pm10"),
+        "PM2_5":       mesures.get("pm2_5"),
+        "PM1":         mesures.get("pm1"),
+    }
+
+    # Supprimer les champs None pour ne pas envoyer de nulls inutiles
+    payload = {k: v for k, v in payload.items() if v is not None or k == "Temps"}
+
+    data    = json.dumps(payload).encode("utf-8")
+    req     = urllib.request.Request(
+        API_URL,
+        data    = data,
+        headers = {"Content-Type": "application/json"},
+        method  = "POST"
     )
-    return conn
+
+    try:
+        with urllib.request.urlopen(req, timeout=API_TIMEOUT) as response:
+            body = response.read().decode("utf-8")
+            resp = json.loads(body)
+            print(f"  → API OK ({response.status}) : {resp.get('message', '')} | Id_DATA={resp.get('Id_DATA', '?')}")
+            return True
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8")
+        print(f"  → ERREUR API HTTP {e.code} : {body}")
+    except urllib.error.URLError as e:
+        print(f"  → ERREUR API connexion : {e.reason}")
+    except Exception as e:
+        print(f"  → ERREUR API inattendue : {e}")
+        traceback.print_exc()
+    return False
 
 
 # =============================================================================
@@ -70,14 +209,10 @@ def decode_A5_09_04(data):
     DB2 (index 2) : CO2         → brut * 10          → ppm
     DB1 (index 3) : Température → brut / 255 * 51    → °C
     """
-    humidite    = round(data[1] / 250.0 * 100.0, 1)
-    co2         = round(data[2] * 10.0, 0)
-    temperature = round(data[3] / 255.0 * 51.0, 1)
-
     return {
-        "temperature": temperature,
-        "humidite":    humidite,
-        "co2":         co2,
+        "humidite":    round(data[1] / 250.0 * 100.0, 1),
+        "co2":         round(data[2] * 10.0, 0),
+        "temperature": round(data[3] / 255.0 * 51.0, 1),
     }
 
 
@@ -105,14 +240,10 @@ def decode_A5_09_07(data):
     }
 
 
-
-
-
 # =============================================================================
 # BUFFER GLOBAL
-# On accumule les mesures de toutes les sondes et on insère une seule ligne
-# dans DATA dès que toutes les sondes actives ont envoyé leurs données,
-# ou après BUFFER_TIMEOUT secondes.
+# Accumule les mesures de toutes les sondes et envoie une seule ligne
+# à l'API dès que toutes les sondes ont répondu, ou après BUFFER_TIMEOUT s.
 # =============================================================================
 
 buffer = {
@@ -124,55 +255,32 @@ buffer = {
     "pm2_5":       None,
     "pm10":        None,
 }
-buffer_recu = set()       # sondes ayant déjà envoyé dans ce cycle
-buffer_ts   = None        # timestamp du premier télégramme du cycle
+buffer_recu = set()
+buffer_ts   = None
 
 def reset_buffer():
     global buffer, buffer_recu, buffer_ts
-    buffer = {k: None for k in buffer}
+    buffer      = {k: None for k in buffer}
     buffer_recu = set()
     buffer_ts   = None
 
 def sondes_actives():
-    """Retourne la liste des adresses de sondes configurées."""
     return set(SONDES.keys())
-
-def inserer_data(conn, mesures):
-    """Insère une ligne complète dans la table DATA."""
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO DATA
-            (Temps, Temperature, humidite, CO2, COV, PM10, PM2_5, PM1)
-        VALUES
-            (?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        datetime.now(),
-        mesures.get("temperature"),
-        mesures.get("humidite"),
-        mesures.get("co2"),
-        mesures.get("cov"),
-        mesures.get("pm10"),
-        mesures.get("pm2_5"),
-        mesures.get("pm1"),
-    ))
-    cursor.close()
 
 
 # =============================================================================
 # TRAITEMENT D'UN PAQUET
 # =============================================================================
 
-def traiter_paquet(conn, packet):
-    """Décode le paquet, met à jour le buffer et insère quand toutes les sondes ont répondu."""
+def traiter_paquet(packet):
     global buffer, buffer_recu, buffer_ts
 
     sender = "inconnu"
     try:
-        sender = enocean.utils.to_hex_string(packet.sender)
+        sender = enocean.utils.to_hex_string(packet.sender).upper()
     except:
         pass
 
-    # Ignorer les senders non configurés
     if sender not in SONDES:
         print(f"  → Sender {sender} non configuré, ignoré.")
         return
@@ -209,14 +317,12 @@ def traiter_paquet(conn, packet):
         print("  → Trame trop courte, ignorée.")
         return
 
-    lrn_bit = (data[4] >> 3) & 0x01
-    if lrn_bit == 0:
+    if (data[4] >> 3) & 0x01 == 0:
         print("  → Télégramme d'appairage (LRN), ignoré.")
         return
 
-    print(f"  EEP fixe    : {eep}")
+    print(f"  EEP fixe : {eep}")
 
-    # Décodage selon l'EEP fixe de la sonde
     if eep == "A5-09-04":
         mesures = decode_A5_09_04(data)
         print(f"  Température : {mesures['temperature']} °C")
@@ -237,30 +343,38 @@ def traiter_paquet(conn, packet):
         print(f"  → EEP {eep} non géré, ignoré.")
         return
 
-    # Mise à jour du buffer global
+    # Mise à jour du buffer
     if buffer_ts is None:
         buffer_ts = time.time()
 
     buffer.update(mesures)
     buffer_recu.add(sender)
-    print(f"  → Buffer mis à jour ({len(buffer_recu)}/{len(sondes_actives())} sondes reçues)")
 
-    # Insertion si toutes les sondes ont répondu
+    manquantes = sondes_actives() - buffer_recu
+    noms_manquants = [SONDES[s]["nom"] for s in manquantes]
+    print(f"  → Buffer : {len(buffer_recu)}/{len(sondes_actives())} sondes reçues")
+    if noms_manquants:
+        print(f"  → En attente de : {', '.join(noms_manquants)}")
+
+    # Envoi si toutes les sondes ont répondu
     if buffer_recu >= sondes_actives():
-        inserer_data(conn, buffer)
-        print(f"  → Toutes les sondes reçues : inséré dans DATA (CQ2A)")
+        print(f"  → Toutes les sondes reçues, envoi à l'API...")
+        envoyer_data(buffer)
+        gerer_ventilateur(buffer)   # ← Contrôle automatique du ventilateur
         reset_buffer()
 
     print(f"--------------------------")
 
 
-def verifier_timeout_buffer(conn):
-    """Insère et vide le buffer si le timeout est dépassé."""
+def verifier_timeout_buffer():
+    """Envoie et vide le buffer si le timeout est dépassé."""
     global buffer_ts
     if buffer_ts is not None and (time.time() - buffer_ts) > BUFFER_TIMEOUT:
-        sondes_manquantes = sondes_actives() - buffer_recu
-        print(f"\n[TIMEOUT] Sondes non reçues : {sondes_manquantes} → insertion partielle")
-        inserer_data(conn, buffer)
+        manquantes = sondes_actives() - buffer_recu
+        noms = [SONDES[s]["nom"] for s in manquantes]
+        print(f"\n[TIMEOUT] Sondes non reçues : {', '.join(noms)} → envoi partiel à l'API")
+        envoyer_data(buffer)
+        gerer_ventilateur(buffer)   # ← Contrôle automatique du ventilateur
         reset_buffer()
 
 
@@ -275,19 +389,21 @@ communicator.start()
 time.sleep(1)
 
 print("\n====== RÉCEPTEUR ENOCEAN - E4000 / P4000 ======")
-print(f"Port série  : {SERIAL_PORT}")
+print(f"Port série : {SERIAL_PORT}")
+print(f"API URL    : {API_URL}")
 
 if communicator.base_id:
-    print(f"BaseID      : {enocean.utils.to_hex_string(communicator.base_id)}")
+    print(f"BaseID     : {enocean.utils.to_hex_string(communicator.base_id)}")
 
-print(f"\nConnexion MariaDB : {DB_USER}@{DB_HOST}/{DB_NAME} ...")
+# Test de connectivité API au démarrage
+print(f"\nTest connexion API...")
 try:
-    db_conn = connect_db()
-    print("Connexion OK.")
+    req = urllib.request.Request(API_URL, method="GET")
+    with urllib.request.urlopen(req, timeout=API_TIMEOUT) as r:
+        print(f"API accessible (HTTP {r.status})")
 except Exception as e:
-    print(f"ERREUR connexion DB : {e}")
-    communicator.stop()
-    raise
+    print(f"⚠ API non accessible : {e}")
+    print("Le script continue, les données seront envoyées dès que l'API répond.")
 
 print("\nEn attente de télégrammes...\n")
 
@@ -304,24 +420,14 @@ try:
                 packet = communicator.receive.get()
 
                 if packet.packet_type == PACKET.RADIO_ERP1:
-                    traiter_paquet(db_conn, packet)
+                    traiter_paquet(packet)
                 else:
                     print(f"Autre paquet : {packet}")
 
             except Exception:
                 traceback.print_exc()
 
-        # Reconnexion DB si besoin
-        try:
-            db_conn.cursor().execute("SELECT 1")
-        except Exception as e:
-            print(f"[DB] Reconnexion : {e}")
-            try:
-                db_conn = connect_db()
-            except Exception:
-                pass
-
-        verifier_timeout_buffer(db_conn)
+        verifier_timeout_buffer()
         time.sleep(0.05)
 
 except KeyboardInterrupt:
@@ -330,8 +436,3 @@ except KeyboardInterrupt:
 finally:
     communicator.stop()
     print("Communication EnOcean arrêtée.")
-    try:
-        db_conn.close()
-        print("Connexion DB fermée.")
-    except:
-        pass
