@@ -2,8 +2,8 @@
 // ─── Configuration de la base de données ─────────────────────────────────────
 define('DB_HOST', 'localhost');
 define('DB_NAME', 'CQ2A');
-define('DB_USER', 'root');
-define('DB_PASS', 'Tauwar41');
+define('DB_USER', 'cq2a_api');
+define('DB_PASS', 'eclipseCQ2A2026');
 define('DB_CHARSET', 'utf8mb4');
 
 function getDB(): PDO {
@@ -39,8 +39,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function getBody(): array {
     $raw = file_get_contents('php://input');
+    if (!is_string($raw)) {
+        return [];
+    }
+
+    $raw = trim($raw);
+    if ($raw === '') {
+        return $_POST ?? [];
+    }
+
+    // Retire un éventuel BOM UTF-8 en début de payload.
+    if (strncmp($raw, "\xEF\xBB\xBF", 3) === 0) {
+        $raw = substr($raw, 3);
+    }
+
     $data = json_decode($raw, true);
-    return $data ?? [];
+    if (is_array($data)) {
+        return $data;
+    }
+
+    // Fallback pour body urlencoded envoyé sans JSON valide.
+    $parsed = [];
+    parse_str($raw, $parsed);
+    if (is_array($parsed) && !empty($parsed)) {
+        return $parsed;
+    }
+
+    return $_POST ?? [];
 }
 
 function respond(int $code, array $data): void {

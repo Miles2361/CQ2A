@@ -1,0 +1,193 @@
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+font-family:Segoe UI, Roboto, sans-serif;
+}
+
+body{
+background:#f5f6f8;
+color:#111;
+padding:30px;
+}
+
+
+/* HEADER */
+
+.topbar{
+display:flex;
+justify-content:space-between;
+align-items:center;
+margin-bottom:30px;
+}
+
+.title{
+display:flex;
+gap:15px;
+align-items:center;
+}
+
+.title h1{
+font-size:22px;
+font-weight:600;
+}
+
+.title p{
+font-size:13px;
+color:#777;
+}
+
+.icon{
+font-size:28px;
+}
+
+.status{
+font-size:14px;
+display:flex;
+align-items:center;
+gap:8px;
+color:#444;
+}
+
+.dot{
+width:10px;
+height:10px;
+background:#27c46a;
+border-radius:50%;
+display:inline-block;
+}
+
+
+/* TABS */
+
+.tabs{
+display:flex;
+gap:10px;
+margin-bottom:25px;
+}
+
+.tab{
+background:#f0f1f4;
+border:none;
+padding:10px 16px;
+border-radius:8px;
+cursor:pointer;
+font-size:14px;
+}
+
+.tab.active{
+background:white;
+box-shadow:0 2px 6px rgba(0,0,0,0.08);
+}
+
+
+/* SCREEN GRID */
+
+.screens{
+display:grid;
+grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+gap:20px;
+}
+
+
+/* CARD */
+
+.screen-card{
+background:white;
+border-radius:14px;
+padding:20px;
+box-shadow:0 4px 12px rgba(0,0,0,0.05);
+transition:0.2s;
+}
+
+.screen-card:hover{
+transform:translateY(-2px);
+box-shadow:0 6px 18px rgba(0,0,0,0.08);
+}
+
+
+.card-header{
+display:flex;
+justify-content:space-between;
+align-items:flex-start;
+margin-bottom:15px;
+}
+
+.card-header h3{
+font-size:16px;
+margin-bottom:4px;
+}
+
+.card-header p{
+font-size:13px;
+color:#777;
+}
+
+
+/* BADGES */
+
+.badge{
+font-size:12px;
+padding:4px 10px;
+border-radius:20px;
+}
+
+.online{
+background:#0e0e1a;
+color:white;
+}
+
+.offline{
+background:#ddd;
+color:#555;
+}
+
+
+/* INFOS */
+
+.info{
+font-size:14px;
+margin-bottom:15px;
+display:grid;
+gap:6px;
+}
+
+.info span{
+color:#777;
+}
+
+
+/* ACTIONS */
+
+.actions{
+display:flex;
+gap:10px;
+}
+
+button{
+border:none;
+cursor:pointer;
+border-radius:8px;
+font-size:14px;
+}
+
+.refresh{
+flex:1;
+background:#f2f3f6;
+padding:8px;
+}
+
+.settings{
+width:36px;
+background:#f2f3f6;
+}
+
+.power{
+width:36px;
+background:#e02d45;
+color:white;
+}
+
+.power.dark{
+background:#111;
+}

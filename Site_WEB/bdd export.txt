@@ -1,0 +1,98 @@
+-- Adminer 4.8.1 MySQL 10.11.6-MariaDB-0+deb12u1 dump
+
+SET NAMES utf8;
+SET time_zone = '+00:00';
+SET foreign_key_checks = 0;
+SET sql_mode = 'NO_AUTO_VALUE_ON_ZERO';
+
+SET NAMES utf8mb4;
+
+DROP TABLE IF EXISTS `Compte`;
+CREATE TABLE `Compte` (
+  `Id_Compte` int(11) NOT NULL AUTO_INCREMENT,
+  `login` varchar(100) NOT NULL,
+  `mot_de_passe` varchar(255) NOT NULL,
+  `derniere_date_de_connexion` datetime DEFAULT NULL,
+  `niveau_d_acces` int(11) NOT NULL,
+  PRIMARY KEY (`Id_Compte`),
+  UNIQUE KEY `login` (`login`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+INSERT INTO `Compte` (`Id_Compte`, `login`, `mot_de_passe`, `derniere_date_de_connexion`, `niveau_d_acces`) VALUES
+(1,	'jdupont',	'mdp123',	'2026-02-25 08:15:00',	1),
+(2,	'smartin',	'mdp123',	'2026-02-25 09:20:00',	2),
+(3,	'lbernard',	'mdp123',	'2026-02-24 18:45:00',	1);
+
+DROP TABLE IF EXISTS `DATA`;
+CREATE TABLE `DATA` (
+  `Id_DATA` int(11) NOT NULL AUTO_INCREMENT,
+  `Temps` datetime NOT NULL,
+  `Temperature` float DEFAULT NULL,
+  `humidite` float DEFAULT NULL,
+  `CO2` float DEFAULT NULL,
+  `COV` float DEFAULT NULL,
+  `PM10` float DEFAULT NULL,
+  `PM2_5` float DEFAULT NULL,
+  `PM1` float DEFAULT NULL,
+  PRIMARY KEY (`Id_DATA`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+INSERT INTO `DATA` (`Id_DATA`, `Temps`, `Temperature`, `humidite`, `CO2`, `COV`, `PM10`, `PM2_5`, `PM1`) VALUES
+(1,	'2026-02-26 08:00:00',	21.5,	45.2,	420,	0.3,	12,	8,	5),
+(2,	'2026-02-26 09:00:00',	22.1,	47.8,	430,	0.4,	15,	9,	6),
+(3,	'2026-02-26 10:00:00',	23,	50.1,	460,	0.5,	18,	11,	7),
+(4,	'2026-02-26 11:00:00',	24.3,	52,	500,	0.6,	20,	13,	9),
+(5,	'2026-02-26 12:00:00',	25,	55.4,	550,	0.8,	25,	16,	11),
+(6,	'2026-02-26 08:00:00',	21.5,	45.2,	420,	0.3,	12,	8,	5),
+(7,	'2026-02-26 09:00:00',	22.1,	47.8,	430,	0.4,	15,	9,	6),
+(8,	'2026-02-26 10:00:00',	23,	50.1,	460,	0.5,	18,	11,	7),
+(9,	'2026-02-26 11:00:00',	24.3,	52,	500,	0.6,	20,	13,	9),
+(10,	'2026-02-26 12:00:00',	25,	55.4,	550,	0.8,	25,	16,	11),
+(11,	'2026-02-26 08:00:00',	26,	45.2,	420,	0.5,	12,	8,	5);
+
+DROP TABLE IF EXISTS `raspberry_pi`;
+CREATE TABLE `raspberry_pi` (
+  `Id_Ecran` int(11) NOT NULL AUTO_INCREMENT,
+  `Adresse_IP` varchar(45) NOT NULL,
+  `nom_ecran` varchar(100) DEFAULT NULL,
+  `niveau_d_acces` int(11) NOT NULL,
+  `Disposition` int(11) NOT NULL,
+  `Etat` bit(1) NOT NULL,
+  `AQI` bit(1) NOT NULL,
+  `co2` bit(1) NOT NULL,
+  `cov` bit(1) NOT NULL,
+  `humidite` bit(1) NOT NULL,
+  `temperature` bit(1) NOT NULL,
+  `pm1` bit(1) NOT NULL,
+  `pm2.5` bit(1) NOT NULL,
+  `pm10` bit(1) NOT NULL,
+  `historique` bit(1) NOT NULL,
+  PRIMARY KEY (`Id_Ecran`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+INSERT INTO `raspberry_pi` (`Id_Ecran`, `Adresse_IP`, `nom_ecran`, `niveau_d_acces`, `Disposition`, `Etat`, `AQI`, `co2`, `cov`, `humidite`, `temperature`, `pm1`, `pm2.5`, `pm10`, `historique`) VALUES
+(1,	'192.168.1.10',	'RPI_Salon',	1,	0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0),
+(2,	'192.168.1.11',	'RPI_Bureau',	1,	0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0),
+(3,	'192.168.1.12',	'RPI_Laboratoire',	2,	0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0),
+(4,	'192.168.1.10',	'RPI_Salon',	1,	0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0),
+(5,	'192.168.1.11',	'RPI_Bureau',	1,	0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0),
+(6,	'192.168.1.12',	'RPI_Laboratoire',	2,	0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0,	CONV('0', 2, 10) + 0);
+
+DROP TABLE IF EXISTS `Se_connecter`;
+CREATE TABLE `Se_connecter` (
+  `Id_Compte` int(11) NOT NULL,
+  `Id_DATA` int(11) NOT NULL,
+  PRIMARY KEY (`Id_Compte`,`Id_DATA`),
+  KEY `Id_DATA` (`Id_DATA`),
+  CONSTRAINT `Se_connecter_ibfk_1` FOREIGN KEY (`Id_Compte`) REFERENCES `Compte` (`Id_Compte`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `Se_connecter_ibfk_2` FOREIGN KEY (`Id_DATA`) REFERENCES `DATA` (`Id_DATA`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+INSERT INTO `Se_connecter` (`Id_Compte`, `Id_DATA`) VALUES
+(1,	1),
+(1,	2),
+(2,	3),
+(2,	4),
+(3,	5);
+
+-- 2026-03-10 13:32:40

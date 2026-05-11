@@ -288,7 +288,7 @@ class Display:
         self.font_small  = pygame.font.SysFont("dejavusans", 18)
         self.font_tiny   = pygame.font.SysFont("dejavusans", 14)
         # Police chiffres — plus grande pour les valeurs capteurs
-        self.font_value  = pygame.font.SysFont("dejavusans", 52, bold=True)
+        self.font_value  = pygame.font.SysFont("dejavusans", 34, bold=True)
         # Police énorme pour la valeur AQI centrale
         self.font_aqi    = pygame.font.SysFont("dejavusans", 62, bold=True)
 
@@ -440,18 +440,15 @@ class Display:
         # Barre de couleur gauche
         pygame.draw.rect(self.screen, color, (x, y + 8, 4, h - 16), border_radius=2)
         # Label
-        self._text(label, self.font_small, TEXT_SECONDARY, x + 14, y + 9)
-        # Valeur + unité sur la même ligne, centrés
+        lbl = f"{icon} {label}" if icon else label
+        self._text(lbl, self.font_tiny, TEXT_SECONDARY, x + 14, y + 9)
+        # Valeur
         val_str = f"{value:.1f}" if isinstance(value, float) else (str(value) if value is not None else "—")
-        val_surf  = self.font_value.render(val_str, True, color)
-        unit_surf = self.font_value.render(f" {unit}", True, color)
-        total_w   = val_surf.get_width() + unit_surf.get_width()
-        cx        = x + w // 2
-        cy        = y + h // 2 + 4
-        val_x     = cx - total_w // 2
-        unit_x    = val_x + val_surf.get_width()
-        self.screen.blit(val_surf,  (val_x,  cy - val_surf.get_height() // 2))
-        self.screen.blit(unit_surf, (unit_x, cy - unit_surf.get_height() // 2))
+        self._text(val_str, self.font_value, color,
+                   x + w // 2, y + h // 2 + 4, anchor="center")
+        # Unité
+        self._text(unit, self.font_tiny, TEXT_DIM,
+                   x + w - 8, y + h - 16, anchor="bottomright")
 
     # ── Sparkline (historique) ────────────────────────────────────────────────
 
@@ -585,28 +582,28 @@ class Display:
             "aqi_w":           self.AQI_W,
             "aqi_h":           self.AQI_H,
             "aqi_font_size":   62,
-            "card_font_size":  52,
-            "label_font_size": 26,   # augmenté (était 18)
+            "card_font_size":  34,
+            "label_font_size": 18,
             "cols":            self.COLS,
         }
         if mode == "solo_aqi":
             base.update({"aqi_w": 600, "aqi_h": 680, "aqi_font_size": 180})
         elif mode == "solo_sensor":
-            base.update({"card_font_size": 200, "label_font_size": 48, "cols": 1})   # était 36
+            base.update({"card_font_size": 160, "label_font_size": 36, "cols": 1})
         elif mode == "duo":
             base.update({
                 "aqi_w": 380, "aqi_h": 500, "aqi_font_size": 110,
-                "card_font_size": 120, "label_font_size": 36, "cols": 1,   # était 26
+                "card_font_size": 90,  "label_font_size": 26, "cols": 1,
             })
         elif mode == "few":
             base.update({
                 "aqi_w": 300, "aqi_h": 380, "aqi_font_size": 80,
-                "card_font_size": 80,  "label_font_size": 30, "cols": 2,   # était 22
+                "card_font_size": 60,  "label_font_size": 22, "cols": 2,
             })
         elif mode == "dense":
             base.update({
                 "aqi_w": 200, "aqi_h": 250, "aqi_font_size": 48,
-                "card_font_size": 36,  "label_font_size": 18, "cols": 4,   # était 13
+                "card_font_size": 26,  "label_font_size": 13, "cols": 4,
             })
         return base
 
@@ -664,21 +661,17 @@ class Display:
         bar_w = max(4, w // 60)
         pygame.draw.rect(self.screen, color, (x, y + 8, bar_w, h - 16), border_radius=2)
 
-        lbl = label
+        lbl = f"{icon} {label}" if icon else label
         pad = bar_w + 8
-        self._text(lbl, fonts["label"], TEXT_SECONDARY, x + pad, y + 10)
+        self._text(lbl, fonts["tiny"], TEXT_SECONDARY, x + pad, y + 10)
 
-        val_str   = (f"{value:.1f}" if isinstance(value, float)
-                     else (str(value) if value is not None else "—"))
-        val_surf  = fonts["value"].render(val_str, True, color)
-        unit_surf = fonts["value"].render(f" {unit}", True, color)
-        total_w   = val_surf.get_width() + unit_surf.get_width()
-        cx        = x + w // 2
-        cy        = y + h // 2 + 4
-        val_x     = cx - total_w // 2
-        unit_x    = val_x + val_surf.get_width()
-        self.screen.blit(val_surf,  (val_x,  cy - val_surf.get_height() // 2))
-        self.screen.blit(unit_surf, (unit_x, cy - unit_surf.get_height() // 2))
+        val_str = (f"{value:.1f}" if isinstance(value, float)
+                   else (str(value) if value is not None else "—"))
+        self._text(val_str, fonts["value"], color,
+                   x + w // 2, y + h // 2 + 4, anchor="center")
+
+        self._text(unit, fonts["tiny"], TEXT_DIM,
+                   x + w - 8, y + h - 16, anchor="bottomright")
 
     # ── Dashboard principal ───────────────────────────────────────────────────
 
@@ -709,13 +702,13 @@ class Display:
         show_hist = cfg.get("historique",  False)
 
         sensors = []
-        if show_temp: sensors.append(("Température", "Temperature", "°C",    "Temperature", ""))
-        if show_hum:  sensors.append(("Humidité",    "humidite",    "% RH",  "humidite",    ""))
-        if show_co2:  sensors.append(("CO₂",         "CO2",         "ppm",   "CO2",         ""))
-        if show_cov:  sensors.append(("COV",         "COV",         "ppm",   "COV",         ""))
-        if show_pm25: sensors.append(("PM 2.5",      "PM2_5",       "µg/m³", "PM2_5",       ""))
-        if show_pm10: sensors.append(("PM 10",       "PM10",        "µg/m³", "PM10",        ""))
-        if show_pm1:  sensors.append(("PM 1",        "PM1",         "µg/m³", "PM1",         ""))
+        if show_temp: sensors.append(("Temp.",    "Temperature", "°C",    "Temperature", "🌡"))
+        if show_hum:  sensors.append(("Humidité", "humidite",    "% RH",  "humidite",    "💧"))
+        if show_co2:  sensors.append(("CO₂",      "CO2",         "ppm",   "CO2",         ""))
+        if show_cov:  sensors.append(("COV",      "COV",         "ppm",   "COV",         ""))
+        if show_pm25: sensors.append(("PM 2.5",   "PM2_5",       "µg/m³", "PM2_5",       ""))
+        if show_pm10: sensors.append(("PM 10",    "PM10",        "µg/m³", "PM10",        ""))
+        if show_pm1:  sensors.append(("PM 1",     "PM1",         "µg/m³", "PM1",         ""))
 
         # ── Calcul du layout adaptatif ────────────────────────────────────────
         mode   = self._get_layout_mode(len(sensors), show_aqi, show_hist)
@@ -777,16 +770,10 @@ class Display:
             card_w = (grid_w - (cols - 1) * M) // cols
             card_h = min(220, (avail_h - (rows - 1) * M) // max(rows, 1))
 
-            last_row       = (len(sensors) - 1) // cols
-            last_row_count = len(sensors) - last_row * cols
-            last_row_total_w = last_row_count * card_w + (last_row_count - 1) * M
-            last_row_offset  = (grid_w - last_row_total_w) // 2
-
             for idx, (label, data_key, unit, thr_key, icon) in enumerate(sensors):
                 row = idx // cols
                 col = idx % cols
-                x_offset = last_row_offset if (row == last_row and last_row_count < cols) else 0
-                cx  = grid_x + x_offset + col * (card_w + M)
+                cx  = grid_x + col * (card_w + M)
                 cy  = TOP + row * (card_h + M)
                 self._draw_sensor_card_adaptive(
                     cx, cy, card_w, card_h,

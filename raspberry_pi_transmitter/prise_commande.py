@@ -22,12 +22,30 @@ PRISE_ID    = "FE:FE:96:B8"
 import sys
 import time
 import traceback
+import signal
 import enocean.utils
+
+try:
+    import fcntl
+except ImportError:
+    fcntl = None
 
 from enocean.consolelogger import init_logging
 from enocean.communicators.serialcommunicator import SerialCommunicator
 from enocean.protocol.packet import Packet
 from enocean.protocol.constants import PACKET, RORG
+
+MAX_RUNTIME_SECONDS = 8
+RUN_LOCK_FILE = "/tmp/prise_commande.lock"
+HAS_ALARM = hasattr(signal, "SIGALRM") and hasattr(signal, "alarm")
+
+
+class CommandTimeout(Exception):
+    pass
+
+
+def _timeout_handler(signum, frame):
+    raise CommandTimeout("Timeout commande prise")
 
 
 def id_str_to_list(id_str):
@@ -94,6 +112,21 @@ if commande not in ("on", "off", "toggle","pair"):
 
 init_logging()
 
+lock_handle = None
+communicator = None
+
+if HAS_ALARM:
+    signal.signal(signal.SIGALRM, _timeout_handler)
+    signal.alarm(MAX_RUNTIME_SECONDS)
+
+try:
+    lock_handle = open(RUN_LOCK_FILE, "w")
+    if fcntl is not None:
+        fcntl.flock(lock_handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+except BlockingIOError:
+    print("Une autre commande prise est déjà en cours (lock).")
+    sys.exit(2)
+
 communicator = SerialCommunicator(port=SERIAL_PORT)
 communicator.start()
 time.sleep(1)
@@ -155,8 +188,23 @@ try:
 
 except KeyboardInterrupt:
     print("\nInterruption.")
+except CommandTimeout:
+    print("\nCommande interrompue (timeout anti-softlock).")
 except Exception:
     traceback.print_exc()
 finally:
-    communicator.stop()
+    if HAS_ALARM:
+        signal.alarm(0)
+    if communicator is not None:
+        try:
+            communicator.stop()
+        except Exception:
+            pass
+    if lock_handle is not None:
+        try:
+            if fcntl is not None:
+                fcntl.flock(lock_handle, fcntl.LOCK_UN)
+            lock_handle.close()
+        except Exception:
+            pass
     print("Communication arrêtée.")

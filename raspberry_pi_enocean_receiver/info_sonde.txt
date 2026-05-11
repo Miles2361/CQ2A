@@ -1,0 +1,8 @@
+2026-03-12 09:32:48,514 - enocean.communicators.SerialCommunicator - DEBUG - FF:D5:A8:0F->FF:FF:FF:FF (-92 dBm): 0x01 ['0xa5', '0x0', '0x0', '0x0', '0xb', '0xff', '0xd5', '0xa8', '0xf', '0x0'] ['0x0', '0xff', '0xff', '0xff', '0xff', '0x5c', '0x0'] OrderedDict()
+------- TELEGRAMME -------
+Sender : FF:D5:A8:0F
+RORG   : 0xa5
+Data   : [165, 0, 0, 0, 11, 255, 213, 168, 15, 0]
+Status : 0
+RSSI   : -92 dBm
+--------------------------

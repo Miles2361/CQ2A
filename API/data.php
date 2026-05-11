@@ -3,6 +3,7 @@ require_once 'config.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 $pdo    = getDB();
+$api_build = 'data.php build 2026-05-05-1603';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /data.php — Récupérer les mesures avec filtres optionnels
@@ -42,6 +43,7 @@ if ($method === 'GET') {
     $total = $countStmt->fetch()['total'];
 
     respond(200, [
+        'api_build' => $api_build,
         'total'  => (int)$total,
         'limit'  => $limit,
         'offset' => $offset,
@@ -76,18 +78,40 @@ if ($method === 'POST') {
     $pm10        = isset($body['PM10'])        ? (float)$body['PM10']        : null;
     $pm2_5       = isset($body['PM2_5'])       ? (float)$body['PM2_5']       : null;
     $pm1         = isset($body['PM1'])         ? (float)$body['PM1']         : null;
+    $aqi         = isset($body['AQI'])         ? (float)$body['AQI']         : null;
+
+    // Refuse les INSERT "vides" (toutes mesures nulles).
+    $mesures = [$temperature, $humidite, $co2, $cov, $pm10, $pm2_5, $pm1, $aqi];
+    $hasData = false;
+    foreach ($mesures as $m) {
+        if ($m !== null) {
+            $hasData = true;
+            break;
+        }
+    }
+    if (!$hasData) {
+        respond(400, [
+            'error' => "Body vide ou invalide : aucune mesure détectée (JSON attendu).",
+            'hint'  => 'Envoyer un POST JSON avec au moins un champ parmi Temperature, humidite, CO2, COV, PM10, PM2_5, PM1, AQI.',
+            'body_received' => $body,
+        ]);
+    }
 
     $stmt = $pdo->prepare("
-        INSERT INTO DATA (Temps, Temperature, humidite, CO2, COV, PM10, PM2_5, PM1)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO DATA (Temps, Temperature, humidite, CO2, COV, PM10, PM2_5, PM1, AQI)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
-    $stmt->execute([$temps, $temperature, $humidite, $co2, $cov, $pm10, $pm2_5, $pm1]);
+    $stmt->execute([$temps, $temperature, $humidite, $co2, $cov, $pm10, $pm2_5, $pm1, $aqi]);
 
     respond(201, [
+        'api_build' => $api_build,
         'message' => 'Mesure enregistrée',
         'Id_DATA' => (int)$pdo->lastInsertId(),
         'Temps'   => $temps,
     ]);
 }
 
-respond(405, ['error' => 'Méthode non autorisée. Table temporelle : GET et POST uniquement (pas de PUT ni DELETE)']);
+respond(405, [
+    'api_build' => $api_build,
+    'error' => 'Méthode non autorisée. Table temporelle : GET et POST uniquement (pas de PUT ni DELETE)'
+]);
