@@ -11,7 +11,7 @@ PORT = "/dev/ttyUSB0"
 
 communicator = SerialCommunicator(
     port=PORT,
-    timeout=0.5   # 🔥 très important
+    timeout=0.5
 )
 communicator.start()
 

@@ -1,3 +1,9 @@
+'''
+Titre : CQ2A/raspberry_pi_screen/display_controller.py
+Nom : Hammouda
+Prénom : Rayan
+Date : 14/05/2026
+'''
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 

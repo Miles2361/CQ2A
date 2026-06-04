@@ -1,3 +1,9 @@
+'''
+Titre : CQ2A/raspberry_pi_enocean_receiver/enocean_example.py
+Nom : Hammouda
+Prénom : Rayan
+Date : 15/03/2026
+'''
 #!/usr/bin/env python
 # -*- encoding: utf-8 -*-
 

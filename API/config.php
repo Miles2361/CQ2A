@@ -1,4 +1,10 @@
 <?php
+'''
+Titre : CQ2A/API/config.php
+Nom : Hammouda
+Prénom : Rayan
+Date : 05/05/2026
+'''
 // ─── Configuration de la base de données ─────────────────────────────────────
 define('DB_HOST', 'localhost');
 define('DB_NAME', 'CQ2A');

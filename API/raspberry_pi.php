@@ -1,4 +1,10 @@
 <?php
+'''
+Titre : CQ2A/API/raspberry_pi.php
+Nom : Hammouda
+Prénom : Rayan
+Date : 10/03/2026
+'''
 require_once 'config.php';
 
 $method     = $_SERVER['REQUEST_METHOD'];

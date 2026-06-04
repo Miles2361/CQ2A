@@ -1,3 +1,9 @@
+'''
+Titre : CQ2A/raspberry_pi_enocean_receiver/enocean_sniffer.py
+Nom : Hammouda
+Prénom : Rayan
+Date : 27/02/2026
+'''
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 

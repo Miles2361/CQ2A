@@ -1,4 +1,10 @@
 <?php
+'''
+Titre : CQ2A/API/data.php
+Nom : Hammouda
+Prénom : Rayan
+Date : 05/05/2026
+'''
 require_once 'config.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
